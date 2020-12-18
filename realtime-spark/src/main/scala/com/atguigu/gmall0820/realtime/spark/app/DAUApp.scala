@@ -34,23 +34,25 @@ object DAUApp {
 
     }
     val firstVisitDstream: DStream[JSONObject] = jsonDStream.filter(jsonObj => {
+      var ifFirst = false
       val pageJson = jsonObj.getJSONObject("page")
       if (pageJson != null) {
         val lastPageId = pageJson.getString("last_page_id")
         if (lastPageId == null || lastPageId.length == 0) {
-          true
-        }else{
-          false
+          ifFirst = true
         }
-      }else{
-        false
-      }
+        }
+      ifFirst
     })
 
+
     val dauJsonObjDStream = firstVisitDstream.mapPartitions { jsonItr =>
-      val jedis = RedisUtil.getJedisClient
+      val jedis: Jedis = RedisUtil.getJedisClient
+      val sourceList: List[JSONObject] = jsonItr.toList
       val listBuffer = new ListBuffer[JSONObject]()
-      for (jsonObj <- jsonItr) {
+      println("before: "+ sourceList.size)
+
+      for (jsonObj <- sourceList) {
         val mid = jsonObj.getJSONObject("common").getString("mid")
         val dt = jsonObj.getString("dt")
         val dauKey = "dau:" + dt
@@ -61,6 +63,7 @@ object DAUApp {
         }
       }
       jedis.close()
+      println("after: "+listBuffer.size)
       listBuffer.toIterator
     }
     dauJsonObjDStream.print(100)
